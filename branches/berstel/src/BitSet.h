@@ -20,18 +20,21 @@ class BitSet
 	typedef BitUtil<TToken, false> BU;
 
 	TToken* TokenArray;
+	// Ones means used bits, Zeros unused bits
 	TToken LastTokenMask;
 	unsigned Tokens;
 	unsigned MaxElements;
 		
+	std::size_t ReqSize(unsigned r) { return sizeof(TToken)*std::max(r, 16u); }
+
 public:
 
 	/// <param ref="maxElements" /> Indicates the maximum number of elements
 	BitSet(unsigned maxElements)
-	{
-		Tokens = maxElements / ElementsPerToken;
+	{		
+		Tokens = maxElements / ElementsPerToken;		
 		if(Tokens * ElementsPerToken != maxElements) Tokens++;
-		TokenArray = (TToken*)malloc(Tokens*sizeof(TToken));
+		TokenArray = (TToken*)malloc(ReqSize(Tokens));
 		MaxElements = maxElements;
 				
 		LastTokenMask = 0;
@@ -47,7 +50,7 @@ public:
 		Tokens = copyFrom.Tokens;
 		LastTokenMask = copyFrom.LastTokenMask;
 		MaxElements = copyFrom.MaxElements;
-		TokenArray = (TToken*)malloc(Tokens*sizeof(TToken));
+		TokenArray = (TToken*)malloc(ReqSize(Tokens));
 		CopyFrom(copyFrom);
 	}
 
@@ -80,7 +83,7 @@ public:
 			Tokens = rh.Tokens;
 			LastTokenMask = rh.LastTokenMask;
 			MaxElements = rh.MaxElements;
-			TokenArray = (TToken*)realloc(TokenArray, sizeof(TToken)*Tokens);
+			TokenArray = (TToken*)realloc(TokenArray, ReqSize(Tokens));
 		}
 		CopyFrom(rh);
 		return *this;
@@ -205,6 +208,10 @@ public:
 		for(unsigned s=0; s<Tokens; s++)
 		{
 			TokenArray[s] = ~TokenArray[s];
+			if(s == Tokens-1)
+			{
+				TokenArray[s] &= LastTokenMask;
+			}
 		}
 	}
 	
@@ -231,5 +238,34 @@ public:
 			}
 			offset += ElementsPerToken;
 		}
+	}
+
+	unsigned Count() const
+	{
+		unsigned c = 0;
+		ForEachMember([&c](TElement i) { c++; return true; });
+		return c;
+	}
+
+	struct hash
+	{
+		std::size_t operator()(const BitSet<TElement,TToken>& rh)
+		{		
+			std::size_t r;
+			r = std::_Hash_seq((const unsigned char*)rh.TokenArray, rh.Tokens*sizeof(TToken));
+			r ^= rh.MaxElements;
+			return r;
+		}
+	};
+
+	bool operator==(const BitSet<TElement, TToken> &other) const 
+	{
+		if(Tokens != other.Tokens) return false;
+		if(MaxElements != other.MaxElements) return false;		
+		for(unsigned i=0; i<Tokens; i++)
+		{
+			if(TokenArray[i] != other.TokenArray[i]) return false;
+		}
+		return true;
 	}
 };

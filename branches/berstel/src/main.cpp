@@ -142,10 +142,10 @@ int main(int argc, char** argv)
 			afd.open(filename);
 			dfa = parser.Parse(afd);
 			afd.close();
-			std::cout << "Begin, states: " << dfa.GetMaxStates() << ", alpha: " << dfa.GetAlphabethLength() << std::endl;
+			std::cout << "Begin, states: " << dfa.GetStates() << ", alpha: " << dfa.GetAlphabethLength() << std::endl;
 			boost::timer::cpu_timer timer;
-			timer.start();			
-			mini.Minimize(dfa);			
+			timer.start();
+			mini.Minimize(dfa);
 			timer.stop();						
 			std::cout << "Done with " << filename << " elapsed (ms) " << timer.elapsed().wall / 1000000UL << std::endl;
 		}
