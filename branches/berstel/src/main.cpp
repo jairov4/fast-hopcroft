@@ -145,7 +145,7 @@ int main(int argc, char** argv)
 
 		exporter.Export(dfa, std::ofstream("dfa4.dot"), false);
 		mini.Minimize(dfa);
-		mini.Minimize2(dfa);
+		//mini.Minimize2(dfa);
 	}
 	{
 		AfdParser<uint32_t, uint8_t> parser;
@@ -223,7 +223,7 @@ int main(int argc, char** argv)
 
 		std::ifstream afd;
 		Dfa<uint32_t, uint8_t> dfa(0,0);
-		mini.ShowConfiguration = false;
+		//mini.ShowConfiguration = false;
 		for(auto filename : files) 
 		{
 			afd.open(filename);

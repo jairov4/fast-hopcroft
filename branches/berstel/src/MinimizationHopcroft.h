@@ -11,16 +11,6 @@
 #include <typeinfo>
 #include "Dfa.h"
 
-template<class T1, class T2>
-struct p_hash
-{
-	std::size_t operator()(std::pair<BitSet<T1,T2>, char> const& p)
-	{
-		BitSet<T1,T2>::hash bsHasher;
-		return bsHasher(p.first) ^ std::hash_value(p.second);
-	}
-};
-
 /// Hopcroft's DFA Minimization Algorithm.
 template<class TState, class TSymbol, class TToken = uint64_t>
 class MinimizationHopcroft
@@ -29,16 +19,16 @@ public:
 	typedef BitSet<TState, TToken> TSet;
 	typedef Dfa<TState, TSymbol, TToken> TDfa;
 	typedef std::pair<TSet, TSymbol> TSplitter;	
-	typedef std::unordered_set<TSplitter, p_hash<TState, TToken>> TSplitterSet;
+	typedef std::unordered_set<TSet, typename TSet::hash> TSplitterSet;
 	typedef std::list<TSet> TPartition;
 
 private:
 
 	/// Extract one member of partition.
 	/// O(1)
-	TSplitter ExtractOne(TSplitterSet& lset)
-	{		
-		TSplitter r = *lset.begin();
+	TSet ExtractOne(TSplitterSet& lset)
+	{
+		TSet r = *lset.begin();
 		lset.erase(lset.begin());
 		return r;
 	}
@@ -93,7 +83,7 @@ private:
 		for(auto c : s)
 		{
 			if(cnt++ > 0) str.append(", ");
-			str.append(SplitterToString(c));
+			str.append(SetToString(c));
 		}
 		str.append("}");
 		return str;
@@ -118,6 +108,21 @@ private:
 		B1.IntersectWith(Bc);
 		B2.Complement();
 		B2.IntersectWith(Bc);
+	}
+
+	TSet Inverse(const TDfa& dfa, const TSet& B, TSymbol a)
+	{
+		TSet outp(dfa.GetStates());
+		// O(Card(B))
+		B.ForEachMember([&, a](TState q)
+		{
+			// O(1)
+			const TSet& pred = dfa.GetPredecessor(q, a);
+			// O(1)
+			outp.UnionWith(pred);
+			return true;
+		});
+		return outp;
 	}
 
 public:
@@ -148,76 +153,85 @@ public:
 		// Un automata sin estado final?
 		assert(final_states_count > 0);
 
-		TSplitterSet W(dfa.GetStates() * dfa.GetAlphabethLength());
-		for(TSymbol a=0; a < dfa.GetAlphabethLength(); a++)
+		TSplitterSet W(dfa.GetStates()*2);
+		
+		if(final_states_count < non_final_states_count) 
 		{
-			if(final_states_count < non_final_states_count) 
-			{
-				W.emplace(dfa.Final, a);
-			} else {
-				W.emplace(t, a);
-			}
+			W.emplace(dfa.Final);
+		} else {
+			W.emplace(t);
 		}
-
+		
 		TSet B1(dfa.GetStates()), B2(dfa.GetStates());
+		TSet S(dfa.GetStates());
 		while (!W.empty())
 		{
-			const TSplitter S = ExtractOne(W);
+			S = ExtractOne(W);
 			if(ShowConfiguration) 
 			{
-				std::cout << "S=" << SplitterToString(S) << std::endl;
+				std::cout << "S=" << SetToString(S) << std::endl;
 			}
-			for(auto B = P.begin(); B != P.end(); )
-			{				
-				if(ShowConfiguration) 
-				{
-					std::cout << "Test B=" << SetToString(*B) << std::endl;
-				}
+			for(TSymbol b=0; b<dfa.GetAlphabethLength(); b++)
+			{
+				// pred = b^(-1).S 
+				// estados que consumiendo b llegan a S
+				// O(Card(S))
+				const TSet pred = Inverse(dfa, S, b);
 
-				// O(Card(S.first))
-				Split(dfa, *B, S.first, S.second, B1, B2);
-				// was there split?
-				if(B1.IsEmpty() || B2.IsEmpty()) 
-				{
-					B++; // advance B
-					continue;
-				}
+				for(auto B = P.begin(); B != P.end(); )
+				{				
+					if(ShowConfiguration) 
+					{
+						std::cout << "Test B=" << SetToString(*B) << std::endl;
+					}
+					
+					// termina de calcular el split en O(1)
+					B1 = pred;
+					B2 = pred;
+					B1.IntersectWith(*B);
+					B2.Complement();
+					B2.IntersectWith(*B);
 
-				if(ShowConfiguration)
-				{
-					std::cout << "B1=" << SetToString(B1) << std::endl;
-					std::cout << "B2=" << SetToString(B2) << std::endl;
-				}
+					// was there split?
+					if(B1.IsEmpty() || B2.IsEmpty()) 
+					{
+						B++; // advance B
+						continue;
+					}
 
-				for(TSymbol b=0; b<dfa.GetAlphabethLength(); b++)
-				{
-					auto f = W.find(TSplitter(*B, b));
+					if(ShowConfiguration)
+					{
+						std::cout << "B1=" << SetToString(B1) << std::endl;
+						std::cout << "B2=" << SetToString(B2) << std::endl;
+					}
+
+					auto f = W.find(*B);
 					if(f != W.end())
 					{
 						W.erase(f);
-						W.emplace(B1, b);
-						W.emplace(B2, b);
-					} else {
+						W.emplace(B1);
+						W.emplace(B2);
+					} else {		
 						auto B1count = B1.Count();
-						auto B2count = dfa.GetStates() - B1count;
+						auto B2count = B2.Count();
 						if(B1count < B2count) 
 						{
-							W.emplace(B1, b);
+							W.emplace(B1);
 						} else {
-							W.emplace(B2, b);
-						}						
+							W.emplace(B2);
+						}		
 					}
-				}
+				
+					// B1 y B2 must be next iterables
+					B = P.erase(B); // advance B
+					B = P.insert(B, B1);
+					B = P.insert(B, B2);
 
-				// B1 y B2 must be next iterables
-				B = P.erase(B); // advance B
-				B = P.insert(B, B1);
-				B = P.insert(B, B2);
-
-				if(ShowConfiguration)
-				{
-					std::cout << "P=" << PartitionToString(P) << std::endl;
-					std::cout << "W=" << SplitterSetToString(W) << std::endl;
+					if(ShowConfiguration)
+					{
+						std::cout << "P=" << PartitionToString(P) << std::endl;
+						std::cout << "W=" << SplitterSetToString(W) << std::endl;
+					}
 				}
 			}
 			if(W.size() % 1000 == 0) std::cout << W.size() << " splitters remaining" << std::endl;
@@ -225,90 +239,6 @@ public:
 		if(ShowConfiguration)
 		{			
 			std::cout << "FINALLY P=" << PartitionToString(P) << std::endl;
-		}
-	}
-
-	void Minimize2(const TDfa& dfa)
-	{
-		// P = { F, ~F }
-		TPartition P;
-		P.push_front(dfa.Final);
-		auto t = dfa.Final;
-		t.Complement();
-		P.push_front(t); 
-
-		// L = { min(P) }
-		TPartition L;
-		L.push_front(dfa.Final);
-
-		// split sets
-		TSet B1(dfa.GetStates()), B2(dfa.GetStates());
-		int countB1, countB2;
-
-		// O(1) empty test
-		while(!L.empty())
-		{
-			auto S = L.back();
-			L.pop_back(); // extraction O(1)                      
-			for(TSymbol a = 0; a < dfa.GetAlphabethLength(); a++)
-			{
-				if(ShowConfiguration) 
-				{
-					auto strS = SetToString(S);
-					auto stra = std::to_string((uint64_t)a);
-					std::cout << "Splitter = (S:" << strS << ", a:" << stra << ")" << std::endl;
-				}
-				auto Biter = P.begin();
-				auto Bend = P.end();
-				while(Biter != Bend)
-				{
-					const auto& B = *Biter;
-					if(ShowConfiguration)
-					{
-						auto strB = SetToString(B);
-						std::cout << "-> B:" << strB << std::endl;
-					}
-
-					B1.Clear(); // O(Nmax) -> constant respect to N
-					B2.Clear(); // O(Nmax) -> constant respect to N
-					Split(dfa, B, S, a, B1, B2); // O(N) -> N elements within B
-
-					auto countB1 = B1.Count();
-					auto countB2 = B2.Count();
-					// was there split?
-					if(countB1 != 0 && countB2 != 0)
-					{
-						// care, it destroys B, do not reference B beyond this point
-						Biter = P.erase(Biter); // O(1)
-						Biter = P.insert(Biter, B1); // O(1)
-						Biter = P.insert(Biter, B2); // O(1)
-						if(countB1 < countB2)
-						{
-							L.push_back(B1); // O(1)
-						} 
-						else 
-						{
-							L.push_back(B2); // O(1)
-						}
-						if(ShowConfiguration) 
-						{
-							auto strB1 = SetToString(B1);
-							auto strB2 = SetToString(B2);
-							auto strL = PartitionToString(L);
-							auto strP = PartitionToString(P);
-
-							std::cout 
-								<< "+ Splits" << std::endl
-								<< " B1:" << strB1 << " B2:" << strB2 << std::endl 
-								<< " L:" << strL << " P:" << strP << std::endl;
-						}
-					} 
-					else 
-					{
-						Biter++;
-					}                                                                               
-				}
-			}
 		}
 	}
 };
