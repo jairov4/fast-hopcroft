@@ -173,6 +173,11 @@ public:
 			}
 			for(TSymbol b=0; b<dfa.GetAlphabethLength(); b++)
 			{
+				if(ShowConfiguration) 
+				{
+					std::cout << "b=" << (uint64_t)b << std::endl;
+				}
+
 				// pred = b^(-1).S 
 				// estados que consumiendo b llegan a S
 				// O(Card(S))
@@ -214,6 +219,7 @@ public:
 					} else {		
 						auto B1count = B1.Count();
 						auto B2count = B2.Count();
+						// El añadido contendra maximo la mitad de los estados en B
 						if(B1count < B2count) 
 						{
 							W.emplace(B1);
@@ -222,10 +228,10 @@ public:
 						}		
 					}
 				
-					// B1 y B2 must be next iterables
+					// TODO: Confirm B1 y B2 insert and skip
+					P.insert(B, B2);
+					P.insert(B, B1);
 					B = P.erase(B); // advance B
-					B = P.insert(B, B1);
-					B = P.insert(B, B2);
 
 					if(ShowConfiguration)
 					{
