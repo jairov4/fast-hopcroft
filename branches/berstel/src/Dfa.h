@@ -18,6 +18,8 @@ template<class TState, class TSymbol, class TToken = uint64_t>
 class Dfa
 {
 public:	
+	typedef BitSet<TState, TToken> TSet;
+
 	/// number of symbols in alphabet
 	unsigned Alphabet;	
 
@@ -25,20 +27,20 @@ public:
 	std::vector<TState> Succesors;
 
 	/// Inverse function
-	std::vector<TState> Predecessors;
+	std::vector<TSet> Predecessors;
 
 	/// Initial states set
-	BitSet<TState, TToken> Initial;
+	TSet Initial;
 
 	/// Final states set
-	BitSet<TState, TToken> Final;
+	TSet Final;
 
 	/// <param ref="alpha" /> is the number of symbols in alphabet.	
 	Dfa(unsigned alpha, unsigned states)
-		: Alphabet(alpha), Succesors(alpha*states), Predecessors(alpha * states), Initial(states), Final(states)
+		: Alphabet(alpha), Succesors(alpha*states), Predecessors(alpha * states, TSet(states)), Initial(states), Final(states)
 	{	
 	}
-
+		
 	/// Get the number of symbols in alphabet
 	unsigned GetAlphabethLength() const { return Alphabet; }
 
@@ -68,7 +70,7 @@ public:
 		auto index1 = Alphabet * source_state + symbol;
 		Succesors[index1] = target_state;
 		auto index2 = Alphabet * target_state + symbol;
-		Predecessors[index2] = source_state;
+		Predecessors[index2].Add(source_state);
 	}
 	
 	/// Get the target state transitioned from <param ref="source" /> consuming <param ref="symbol" />
@@ -81,7 +83,7 @@ public:
 
 	/// Get the source state transitioned to <param ref="target" /> consuming <param ref="symbol"/>
 	/// O(1)
-	TState GetPredecessor(TState target, TSymbol symbol) const
+	const TSet& GetPredecessor(TState target, TSymbol symbol) const
 	{
 		auto index = target * Alphabet + symbol;
 		return Predecessors[index];
