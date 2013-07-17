@@ -40,6 +40,10 @@ public:
 	}
 };
 
+#ifdef _MSC_VER  
+// MSVC specific - intrinsics usage
+// TODO: port to use GNU G++ intrinsics
+
 template<typename Allocator>
 class dynamic_bitset<uint64_t, Allocator> : public boost::dynamic_bitset<uint64_t, Allocator>
 {
@@ -132,6 +136,8 @@ __other_block:
 
 };
 
+#endif//_MSC_VER  
+
 /// Hopcroft's DFA Minimization Algorithm.
 template<class TState, class TSymbol, class TToken = uint64_t>
 class MinimizationHopcroft
@@ -197,6 +203,8 @@ public:
 		// cantidad de estados en la particion y particion
 		// Maximo puede exisitir una particion por cada estado, por ello reservamos de esta forma
 		vector<TState> Pcontent(dfa.GetStates());
+		// vector de parejas que indican en el vector de contenido cada particion
+		// Cada pareja contiene el indice donde inicia una particion y su longitud
 		TPartitionSet P(dfa.GetStates());
 
 		P[0].first = 0;
