@@ -49,15 +49,18 @@ namespace QAnalyze
         {
             var data = DataTable.New.ReadCsv("report_401_mod.csv");
             var fn_plot_compression_vs_density = "report_401_compression_vs_density.pdf";
-
+            var fn_plot_dfa_states_vs_density = "report_401_dfa_states_vs_density.pdf";
 
             var rows = data.RowsAs<ReportRow401>();
             var alphas = (from c in rows select c.alpha).Distinct();
             var states = (from c in rows select c.states).Distinct();
             var densities = (from c in rows select c.d).Distinct();
 
-            var plotModel = new PlotModel();
-            plotModel.Title = "States count compression ratio vs density";
+            var compression_plot = new PlotModel();
+            compression_plot.Title = "States count compression ratio vs density";
+
+            var dfa_states_plot = new PlotModel();
+            dfa_states_plot.Title = "Average DFA states vs density";
 
             var p = from k in alphas from n in states select new { k, n };
             foreach (var item in p)
@@ -67,6 +70,7 @@ namespace QAnalyze
                              group c by c.d into g
                              let n = g.Average(x => x.states_dfa)
                              let r = g.Average(x => (x.states_dfa - x.c_h) / (float)x.states_dfa)
+                             orderby g.Key
                              select new { d = g.Key, n = n, r = r, c = g.Count() };
 
                 var series_ratio = new LineSeries();
@@ -76,15 +80,24 @@ namespace QAnalyze
                 series_ratio.DataFieldY = "r";
                 series_ratio.StrokeThickness = LineThickness;
 
-                plotModel.Series.Add(series_ratio);
+                var series_dfa_states = new LineSeries();
+                series_dfa_states.Title = string.Format("NFAs k={0}, n={1}", item.k, item.n);
+                series_dfa_states.ItemsSource = resume;
+                series_dfa_states.DataFieldX = "d";
+                series_dfa_states.DataFieldY = "n";
+                series_dfa_states.StrokeThickness = LineThickness;
+
+                compression_plot.Series.Add(series_ratio);
+                dfa_states_plot.Series.Add(series_dfa_states);
             }
             var fn = string.Format(fn_plot_compression_vs_density);
-            PdfExporter.Export(plotModel, fn_plot_compression_vs_density, CanvasWidth, CanvasHeight);
+            PdfExporter.Export(compression_plot, fn_plot_compression_vs_density, CanvasWidth, CanvasHeight);
+            PdfExporter.Export(dfa_states_plot, fn_plot_dfa_states_vs_density, CanvasWidth, CanvasHeight);
         }
 
         static void Main(string[] args)
         {
-            Directory.SetCurrentDirectory(@"C:\Users\Jairo\Documents\Visual Studio 2012\Projects\fast-hopcroft\build\src\test");
+            //Directory.SetCurrentDirectory(@"C:\Users\Jairo\Documents\Visual Studio 2012\Projects\fast-hopcroft\build\src\test");
             Report401();
             //Report501();
         }
