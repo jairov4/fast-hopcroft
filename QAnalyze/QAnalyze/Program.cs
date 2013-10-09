@@ -58,9 +58,11 @@ namespace QAnalyze
 
             var compression_plot = new PlotModel();
             compression_plot.Title = "States count compression ratio vs density";
+            compression_plot.LegendPlacement = LegendPlacement.Outside;
 
             var dfa_states_plot = new PlotModel();
             dfa_states_plot.Title = "Average DFA states vs density";
+            dfa_states_plot.LegendPlacement = LegendPlacement.Outside;
 
             var p = from k in alphas from n in states select new { k, n };
             foreach (var item in p)
