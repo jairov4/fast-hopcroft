@@ -29,6 +29,7 @@ namespace QAnalyze
         public long states { get; set; }
         public long alpha { get; set; }
         public float d { get; set; }
+        public float fd { get; set; }
         public long states_dfa { get; set; }
         public long c_h { get; set; }
         public long t_h { get; set; }
@@ -47,7 +48,7 @@ namespace QAnalyze
 
         static void Report401()
         {
-            var data = DataTable.New.ReadCsv("report_401_mod.csv");
+            var data = DataTable.New.ReadCsv("report_401.csv");
             var fn_plot_compression_vs_density = "report_401_compression_vs_density.pdf";
             var fn_plot_dfa_states_vs_density = "report_401_dfa_states_vs_density.pdf";
 
@@ -55,20 +56,26 @@ namespace QAnalyze
             var alphas = (from c in rows select c.alpha).Distinct();
             var states = (from c in rows select c.states).Distinct();
             var densities = (from c in rows select c.d).Distinct();
+            var finals_densities = (from c in rows select c.fd).Distinct();
 
             var compression_plot = new PlotModel();
             compression_plot.Title = "States count compression ratio vs density";
             compression_plot.LegendPlacement = LegendPlacement.Outside;
+            compression_plot.Axes.Add(new LinearAxis(AxisPosition.Bottom, "Transition function density"));
+            compression_plot.Axes.Add(new LinearAxis(AxisPosition.Left, "Ratio"));                
+
 
             var dfa_states_plot = new PlotModel();
             dfa_states_plot.Title = "Average DFA states vs density";
             dfa_states_plot.LegendPlacement = LegendPlacement.Outside;
-
-            var p = from k in alphas from n in states select new { k, n };
+            dfa_states_plot.Axes.Add(new LinearAxis(AxisPosition.Bottom, "Transition function density"));
+            dfa_states_plot.Axes.Add(new LinearAxis(AxisPosition.Left, "DFA states"));                
+            
+            var p = from k in alphas from n in states from fd in finals_densities select new { k, n, fd };
             foreach (var item in p)
             {
                 var resume = from c in rows
-                             where c.states == item.n && c.alpha == item.k
+                             where c.states == item.n && c.alpha == item.k && c.fd == item.fd
                              group c by c.d into g
                              let n = g.Average(x => x.states_dfa)
                              let r = g.Average(x => (x.states_dfa - x.c_h) / (float)x.states_dfa)
@@ -76,20 +83,20 @@ namespace QAnalyze
                              select new { d = g.Key, n = n, r = r, c = g.Count() };
 
                 var series_ratio = new LineSeries();
-                series_ratio.Title = string.Format("k={0}, n={1}", item.k, item.n);
+                series_ratio.Title = string.Format("k={0}, n={1}, fd={2}", item.k, item.n, item.fd);
                 series_ratio.ItemsSource = resume;
-                series_ratio.DataFieldX = "d";
-                series_ratio.DataFieldY = "r";
+                series_ratio.DataFieldX = "d";                
+                series_ratio.DataFieldY = "r";                
                 series_ratio.StrokeThickness = LineThickness;
 
                 var series_dfa_states = new LineSeries();
-                series_dfa_states.Title = string.Format("NFAs k={0}, n={1}", item.k, item.n);
+                series_dfa_states.Title = string.Format("NFAs k={0}, n={1} fd={2}", item.k, item.n, item.fd);
                 series_dfa_states.ItemsSource = resume;
-                series_dfa_states.DataFieldX = "d";
-                series_dfa_states.DataFieldY = "n";
+                series_dfa_states.DataFieldX = "d";                
+                series_dfa_states.DataFieldY = "n";                
                 series_dfa_states.StrokeThickness = LineThickness;
 
-                compression_plot.Series.Add(series_ratio);
+                compression_plot.Series.Add(series_ratio);                
                 dfa_states_plot.Series.Add(series_dfa_states);
             }
             var fn = string.Format(fn_plot_compression_vs_density);
