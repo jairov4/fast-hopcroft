@@ -148,11 +148,7 @@ namespace QAnalyze
 
 		[STAThread]
 		static void Main(string[] args)
-		{
-			//Directory.SetCurrentDirectory(@"C:\Users\Jairo\Documents\Visual Studio 2012\Projects\fast-hopcroft\build\src\test");
-			//Report401();
-			//Report501();
-
+		{			
 			string invokedVerb = null;
 			object invokedVerbInstance = null;
 
