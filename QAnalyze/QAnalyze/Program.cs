@@ -12,6 +12,8 @@ using PdfSharp.Pdf.IO;
 using PdfSharp.Pdf;
 using PdfSharp.Drawing;
 using System.Windows.Forms;
+using CommandLine;
+using CommandLine.Text;
 
 namespace QAnalyze
 {
@@ -40,6 +42,43 @@ namespace QAnalyze
 		public long t_hi { get; set; }
 	}
 
+	public class Options
+	{
+		public Options()
+		{			
+		}
+
+		[VerbOption("performance", HelpText = "Process performance data from CSV files containing time durations per algorithm")]
+		public OptionsBasicReport PerformanceReport { get; set; }
+
+		[VerbOption("states", HelpText = "Analyze data from CSV file containing result of apply FSA minimization algorithms")]
+		public OptionsBasicReport StatesReport { get; set; }
+
+		[HelpVerbOption]
+		public string GetUsage(string verb)
+		{
+			return HelpText.AutoBuild(this, verb);
+		}
+
+		[HelpOption]
+		public string GetUsage()
+		{
+			return HelpText.AutoBuild(this);
+		}
+	}
+
+	public class OptionsBasicReport
+	{
+		[Option('v', "verbose", DefaultValue = false, HelpText = "Verbose mode")]
+		public bool Verbose { get; set; }
+
+		[Option('i', "input", HelpText = "Path to CSV input file")]
+		public string InputFile { get; set; }
+
+		[Option('o', "output", HelpText = "Folder to allocate output PDF files")]
+		public string OutputFolder { get; set; }
+	}
+
 	class Program
 	{
 		const int CanvasWidth = 640;
@@ -47,11 +86,13 @@ namespace QAnalyze
 		const double MarkerSize = 5.0;
 		const double LineThickness = 2.0;
 
-		static void Report401()
+		static void Report401(OptionsBasicReport options)
 		{
-			var data = DataTable.New.ReadCsv("report_401.csv");
-			var fn_plot_compression_vs_density = "report_401_compression_vs_density.pdf";
-			var fn_plot_dfa_states_vs_density = "report_401_dfa_states_vs_density.pdf";
+			SurePaths(options);
+
+			var data = DataTable.New.ReadCsv(options.InputFile);
+			var fn_plot_compression_vs_density = Path.Combine(options.OutputFolder, "compression_vs_density.pdf");
+			var fn_plot_dfa_states_vs_density = Path.Combine(options.OutputFolder, "dfa_states_vs_density.pdf");
 
 			var rows = data.RowsAs<ReportRow401>();
 			var alphas = (from c in rows select c.alpha).Distinct();
@@ -100,7 +141,7 @@ namespace QAnalyze
 				compression_plot.Series.Add(series_ratio);
 				dfa_states_plot.Series.Add(series_dfa_states);
 			}
-			var fn = string.Format(fn_plot_compression_vs_density);
+			
 			PdfExporter.Export(compression_plot, fn_plot_compression_vs_density, CanvasWidth, CanvasHeight);
 			PdfExporter.Export(dfa_states_plot, fn_plot_dfa_states_vs_density, CanvasWidth, CanvasHeight);
 		}
@@ -110,28 +151,43 @@ namespace QAnalyze
 		{
 			//Directory.SetCurrentDirectory(@"C:\Users\Jairo\Documents\Visual Studio 2012\Projects\fast-hopcroft\build\src\test");
 			//Report401();
-			Report501();
+			//Report501();
+
+			string invokedVerb = null;
+			object invokedVerbInstance = null;
+
+			var options = new Options();
+			if (!CommandLine.Parser.Default.ParseArguments(args, options,
+			  (verb, subOptions) =>
+			  {
+				  // if parsing succeeds the verb name and correct instance
+				  // will be passed to onVerbCommand delegate (string,object)
+				  invokedVerb = verb;
+				  invokedVerbInstance = subOptions;
+
+			  }))
+			{
+				Environment.Exit(CommandLine.Parser.DefaultExitCodeFail);
+			}
+
+			if (invokedVerb == "performance") Report501((OptionsBasicReport)invokedVerbInstance);
+			else if (invokedVerb == "states") Report401((OptionsBasicReport)invokedVerbInstance);
 		}
 
-		private static void Report501()
+		private static void Report501(OptionsBasicReport options)
 		{
-			var dialog = new OpenFileDialog();
-			dialog.Filter = "*.csv|*.csv";
-			if (dialog.ShowDialog() != DialogResult.OK) return;
+			SurePaths(options);
 
-			var dialog2 = new FolderBrowserDialog();
-			if (dialog2.ShowDialog() != DialogResult.OK) return;
+			var data = DataTable.New.ReadCsv(options.InputFile);
 
-			var data = DataTable.New.ReadCsv(dialog.FileName);
-
-			var fn_plot_time_vs_states = Path.Combine(dialog2.SelectedPath, "time_vs_states_k{0}.pdf");
-			var fn_plot_freq_vs_states = Path.Combine(dialog2.SelectedPath, "freq_vs_states_k{0}.pdf");
-			var fn_plot_ratio_vs_states = Path.Combine(dialog2.SelectedPath, "ratio_vs_states_k{0}.pdf");
-			var fn_plot_tratio_vs_states = Path.Combine(dialog2.SelectedPath, "timeratio_vs_states_k{0}.pdf");
-			var fn_plot_time_vs_alpha = Path.Combine(dialog2.SelectedPath, "time_vs_alpha_n{0}.pdf");
-			var fn_plot_freq_vs_alpha = Path.Combine(dialog2.SelectedPath, "freq_vs_alpha_n{0}.pdf");
-			var fn_plot_ratio_vs_alpha = Path.Combine(dialog2.SelectedPath, "ratio_vs_alpha_n{0}.pdf");
-			var fn_plot_tratio_vs_alpha = Path.Combine(dialog2.SelectedPath, "timeratio_vs_alpha_n{0}.pdf");
+			var fn_plot_time_vs_states = Path.Combine(options.OutputFolder, "time_vs_states_k{0}.pdf");
+			var fn_plot_freq_vs_states = Path.Combine(options.OutputFolder, "freq_vs_states_k{0}.pdf");
+			var fn_plot_ratio_vs_states = Path.Combine(options.OutputFolder, "ratio_vs_states_k{0}.pdf");
+			var fn_plot_tratio_vs_states = Path.Combine(options.OutputFolder, "timeratio_vs_states_k{0}.pdf");
+			var fn_plot_time_vs_alpha = Path.Combine(options.OutputFolder, "time_vs_alpha_n{0}.pdf");
+			var fn_plot_freq_vs_alpha = Path.Combine(options.OutputFolder, "freq_vs_alpha_n{0}.pdf");
+			var fn_plot_ratio_vs_alpha = Path.Combine(options.OutputFolder, "ratio_vs_alpha_n{0}.pdf");
+			var fn_plot_tratio_vs_alpha = Path.Combine(options.OutputFolder, "timeratio_vs_alpha_n{0}.pdf");
 
 			var rows = data.RowsAs<ReportRow501>();
 			var alphas = (from c in rows select c.k).Distinct();
@@ -467,7 +523,27 @@ namespace QAnalyze
 				}
 			}
 			pdf_filenames.Sort();
-			MergePdf(pdf_filenames, Path.Combine(dialog2.SelectedPath, "charts_combined.pdf"));
+			MergePdf(pdf_filenames, Path.Combine(options.OutputFolder, "charts_combined.pdf"));
+		}
+
+		private static void SurePaths(OptionsBasicReport options)
+		{
+			if (string.IsNullOrWhiteSpace(options.InputFile))
+			{
+				var dialog = new OpenFileDialog();
+				dialog.Title = "Select CSV input file";
+				dialog.Filter = "*.csv|*.csv";
+				if (dialog.ShowDialog() != DialogResult.OK) Environment.Exit(CommandLine.Parser.DefaultExitCodeFail);
+				options.InputFile = dialog.FileName;
+			}
+
+			if (string.IsNullOrWhiteSpace(options.OutputFolder))
+			{
+				var dialog2 = new FolderBrowserDialog();
+				dialog2.Description = "Select the output folder";
+				if (dialog2.ShowDialog() != DialogResult.OK) Environment.Exit(CommandLine.Parser.DefaultExitCodeFail);
+				options.OutputFolder = dialog2.SelectedPath;
+			}
 		}
 
 		static void MergePdf(IEnumerable<string> documents, string fnoutpdf)
